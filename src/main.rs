@@ -8,7 +8,20 @@ struct Person {
     velocity: (f64, f64),
 }
 
+use sql_builder::SqlBuilder;
+
 fn main() -> Result<()> {
+    let sql = SqlBuilder::select_from("company")
+        .field("id")
+        .field("name")
+        .and_where_gt("salary", 25_000)
+        .sql();
+
+    match sql {
+        Ok(sql) => println!("{}", sql),
+        Err(e) => println!("Error: {}", e),
+    }
+
     let conn = Connection::open_in_memory()?;
 
     conn.execute_batch(
