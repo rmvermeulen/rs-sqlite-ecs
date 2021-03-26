@@ -1,4 +1,4 @@
-use rusqlite::{named_params, params, Connection, Result};
+use rusqlite::{named_params, params, Connection, Result, NO_PARAMS};
 
 #[derive(Debug)]
 struct Person {
@@ -11,57 +11,80 @@ struct Person {
 fn main() -> Result<()> {
     let conn = Connection::open_in_memory()?;
 
+    conn.execute("CREATE TABLE entity (id INTEGER PRIMARY KEY)", params![])?;
+
     conn.execute(
-        "CREATE TABLE person (
-                  id              INTEGER PRIMARY KEY,
-                  name            TEXT NOT NULL,
-                  x               FLOAT DEFAULT 0.0,
-                  y               FLOAT DEFAULT 0.0,
-                  vx              FLOAT DEFAULT 0.0,
-                  vy              FLOAT DEFAULT 0.0)",
+        "
+        CREATE TABLE position (
+            id          INTEGER,
+            x           FLOAT DEFAULT 0,
+            y           FLOAT DEFAULT 0,
+
+            FOREIGN KEY(id) REFERENCES entity(id)
+        )
+        ",
         params![],
     )?;
-    let person = Person {
-        id: 0,
-        name: "Steven".to_string(),
-        position: (0., 0.),
-        velocity: (0., 0.),
-    };
+
     conn.execute(
-        "INSERT INTO person (name, x, y, vx) VALUES (?1, ?2, ?3, ?4)",
-        params![person.name, person.position.0, person.position.1, 10.],
+        "
+        CREATE TABLE velocity (
+            id          INTEGER,
+            x           FLOAT DEFAULT 0,
+            y           FLOAT DEFAULT 0,
+
+            FOREIGN KEY(id) REFERENCES entity(id)
+        )
+        ",
+        params![],
+    )?;
+
+    let params = named_params! {":id": 0};
+    conn.execute_named("INSERT INTO entity VALUES (:id)", params)?;
+    conn.execute_named("INSERT INTO position VALUES (:id, 100, 100)", params)?;
+    conn.execute_named("INSERT INTO velocity VALUES (:id, 0, -10) ", params)?;
+
+    let mut velocity_system = conn.prepare(
+        "
+        UPDATE position AS p SET
+            x = v.x * :delta,
+            y = v.y * :delta
+        FROM velocity AS v WHERE p.id = v.id
+    ",
+    )?;
+
+    let mut print_position_system = conn.prepare(
+        "SELECT p.id, p.x, p.y, v.x, v.y
+        FROM position p JOIN velocity v ON p.id=v.id",
     )?;
 
     let framerate = 30;
-    let mut updater = conn.prepare("UPDATE person SET x = x + vx * :delta, y = y + vy * :delta")?;
-    let mut stmt = conn.prepare("SELECT id, name, x, y, vx, vy FROM person")?;
     let mut count = 0;
     let mut delta: f64 = 0.;
     let mut fps = fps_clock::FpsClock::new(framerate);
+
     loop {
-        let updated = updater.execute_named(named_params! {":delta": delta })?;
-        let persons: Vec<_> = stmt
-            .query_map(params![], |row| {
-                Ok(Person {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    position: (row.get(2)?, row.get(3)?),
-                    velocity: (row.get(4)?, row.get(5)?),
-                })
-            })?
-            .map(|person| {
-                let person = person.unwrap();
-
-                format!("{}@{:?}", person.name, person.position)
-            })
-            .collect();
-
         // game logic
-        println!("{} {} (fps: {}) {:?}", count, delta, 1.0 / delta, persons);
+        velocity_system.execute_named(named_params! {":delta":delta})?;
+
+        let mut positions = print_position_system.query(NO_PARAMS)?;
+        while let Some(pos) = positions.next()? {
+            println!(
+                "{:?} {{ pos: ({:?}, {:?}), vel: ({:?}, {:?}) }}",
+                pos.get::<usize, i32>(0)?,
+                pos.get::<usize, f64>(1)?,
+                pos.get::<usize, f64>(2)?,
+                pos.get::<usize, f64>(3)?,
+                pos.get::<usize, f64>(4)?
+            );
+        }
+
+        // println!("{} {} (fps: {})", count / framerate, delta, 1.0 / delta);
+
         count += 1;
         // update timer
         delta = fps.tick() as f64 / 10e8;
-        if count > 60 * framerate {
+        if count > 5 * framerate {
             break;
         }
     }
