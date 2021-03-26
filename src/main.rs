@@ -47,41 +47,53 @@ fn main() -> Result<()> {
     let mut velocity_system = conn.prepare(
         "
         UPDATE position AS p SET
-            x = v.x * :delta,
-            y = v.y * :delta
-        FROM velocity AS v WHERE p.id = v.id
+            x = p.x + (v.x * :delta),
+            y = p.y + (v.y * :delta)
+        FROM velocity v WHERE p.id = v.id
     ",
     )?;
 
     let mut print_position_system = conn.prepare(
-        "SELECT p.id, p.x, p.y, v.x, v.y
-        FROM position p JOIN velocity v ON p.id=v.id",
+        "
+        SELECT p.id, p.x, p.y, v.x, v.y
+        FROM position p
+        JOIN velocity v
+        ON p.id = v.id
+        ",
     )?;
 
-    let framerate = 30;
+    let framerate = 25;
     let mut count = 0;
     let mut delta: f64 = 0.;
     let mut fps = fps_clock::FpsClock::new(framerate);
 
     loop {
+        let is_whole_second = count % framerate == 0;
+
         // game logic
         velocity_system.execute_named(named_params! {":delta":delta})?;
 
-        let mut positions = print_position_system.query(NO_PARAMS)?;
-        while let Some(pos) = positions.next()? {
-            println!(
-                "{:?} {{ pos: ({:?}, {:?}), vel: ({:?}, {:?}) }}",
-                pos.get::<usize, i32>(0)?,
-                pos.get::<usize, f64>(1)?,
-                pos.get::<usize, f64>(2)?,
-                pos.get::<usize, f64>(3)?,
-                pos.get::<usize, f64>(4)?
-            );
+        if is_whole_second {
+            let mut positions = print_position_system.query(NO_PARAMS)?;
+            while let Some(pos) = positions.next()? {
+                println!(
+                    "{:?} {{ pos: ({:?}, {:?}), vel: ({:?}, {:?}) }}",
+                    pos.get::<usize, i32>(0)?,
+                    pos.get::<usize, f64>(1)?,
+                    pos.get::<usize, f64>(2)?,
+                    pos.get::<usize, f64>(3)?,
+                    pos.get::<usize, f64>(4)?
+                );
+            }
         }
-
         // println!("{} {} (fps: {})", count / framerate, delta, 1.0 / delta);
 
         count += 1;
+        if is_whole_second {
+            println!("a second passed");
+            println!("delta: {:?}", delta);
+            println!("efps: {:?}/{:?}", (1.0 / delta).trunc(), framerate);
+        }
         // update timer
         delta = fps.tick() as f64 / 10e8;
         if count > 5 * framerate {
