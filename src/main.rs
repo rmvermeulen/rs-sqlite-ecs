@@ -11,38 +11,43 @@ struct Person {
 fn main() -> Result<()> {
     let conn = Connection::open_in_memory()?;
 
-    conn.execute("CREATE TABLE entity (id INTEGER PRIMARY KEY)", params![])?;
-
-    conn.execute(
+    conn.execute_batch(
         "
+        BEGIN;
+
+        CREATE TABLE entity (
+            id          INTEGER PRIMARY KEY
+        );
         CREATE TABLE position (
             id          INTEGER,
             x           FLOAT DEFAULT 0,
             y           FLOAT DEFAULT 0,
 
             FOREIGN KEY(id) REFERENCES entity(id)
-        )
-        ",
-        params![],
-    )?;
-
-    conn.execute(
-        "
+        );
         CREATE TABLE velocity (
             id          INTEGER,
             x           FLOAT DEFAULT 0,
             y           FLOAT DEFAULT 0,
 
             FOREIGN KEY(id) REFERENCES entity(id)
-        )
-        ",
-        params![],
+        );
+
+        COMMIT;",
     )?;
 
-    let params = named_params! {":id": 0};
-    conn.execute_named("INSERT INTO entity VALUES (:id)", params)?;
-    conn.execute_named("INSERT INTO position VALUES (:id, 100, 100)", params)?;
-    conn.execute_named("INSERT INTO velocity VALUES (:id, 0, -10) ", params)?;
+    conn.execute_batch(
+        "
+        BEGIN;
+
+        REPLACE INTO entity DEFAULT VALUES;
+
+        REPLACE INTO position VALUES (:id, 100, 100);
+
+        REPLACE INTO velocity VALUES (:id, 0, -10);
+
+        COMMIT;",
+    )?;
 
     let mut velocity_system = conn.prepare(
         "
