@@ -1,4 +1,10 @@
-use rusqlite::{named_params, params, Connection, Result, NO_PARAMS};
+#[macro_use]
+use impls::impls;
+
+use diesel::backend::SupportsReturningClause;
+use diesel::prelude::*;
+use dotenv::dotenv;
+use std::env;
 
 #[derive(Debug)]
 struct Person {
@@ -8,116 +14,119 @@ struct Person {
     velocity: (f64, f64),
 }
 
-use sql_builder::SqlBuilder;
+type Result<T> = std::result::Result<T, anyhow::Error>;
 
 fn main() -> Result<()> {
-    let sql = SqlBuilder::select_from("company")
-        .field("id")
-        .field("name")
-        .and_where_gt("salary", 25_000)
-        .sql();
+    dotenv().ok();
 
-    match sql {
-        Ok(sql) => println!("{}", sql),
-        Err(e) => println!("Error: {}", e),
-    }
+    assert!(impls!(diesel::sqlite::Sqlite: SupportsReturningClause));
 
-    let conn = Connection::open_in_memory()?;
+    // let conn = Connection::open_in_memory()?;
 
-    conn.execute_batch(
-        "
-        BEGIN;
+    // conn.execute_batch(
+    //     "
+    //     BEGIN;
 
-        CREATE TABLE entity (
-            id          INTEGER PRIMARY KEY
-        );
-        CREATE TABLE position (
-            id          INTEGER,
-            x           FLOAT DEFAULT 0,
-            y           FLOAT DEFAULT 0,
+    //     CREATE TABLE entity (
+    //         id          INTEGER PRIMARY KEY
+    //     );
+    //     CREATE TABLE position (
+    //         id          INTEGER,
+    //         x           FLOAT DEFAULT 0,
+    //         y           FLOAT DEFAULT 0,
 
-            FOREIGN KEY(id) REFERENCES entity(id)
-        );
-        CREATE TABLE velocity (
-            id          INTEGER,
-            x           FLOAT DEFAULT 0,
-            y           FLOAT DEFAULT 0,
+    //         FOREIGN KEY(id) REFERENCES entity(id)
+    //     );
+    //     CREATE TABLE velocity (
+    //         id          INTEGER,
+    //         x           FLOAT DEFAULT 0,
+    //         y           FLOAT DEFAULT 0,
 
-            FOREIGN KEY(id) REFERENCES entity(id)
-        );
+    //         FOREIGN KEY(id) REFERENCES entity(id)
+    //     );
 
-        COMMIT;",
-    )?;
+    //     COMMIT;",
+    // )?;
 
-    conn.execute_batch(
-        "
-        BEGIN;
+    // let id: i32 = conn.query_row(
+    //     "INSERT INTO entity DEFAULT VALUES RETURNING *;",
+    //     NO_PARAMS,
+    //     |row| row.get(0),
+    // )?;
 
-        REPLACE INTO entity DEFAULT VALUES;
+    // // .and_then(|id: i32| {
+    // //     conn.execute("INSERT INTO position VALUES (?, 100, 100)", params![id])
+    // //         .and(conn.execute("INSERT INTO velocity VALUES (?, 0, -1)", params![id]))
+    // // })?;
 
-        REPLACE INTO position VALUES (:id, 100, 100);
+    // // conn.execute_batch(
+    // //     "
+    // //     BEGIN;
 
-        REPLACE INTO velocity VALUES (:id, 0, -10);
+    // //     REPLACE INTO position VALUES (:id, 100, 100);
 
-        COMMIT;",
-    )?;
+    // //     REPLACE INTO velocity VALUES (:id, 0, -10);
 
-    let mut velocity_system = conn.prepare(
-        "
-        UPDATE position AS p SET
-            x = p.x + (v.x * :delta),
-            y = p.y + (v.y * :delta)
-        FROM velocity v WHERE p.id = v.id
-    ",
-    )?;
+    // //     COMMIT;",
+    // //     named_params! {":id": entity as i32},
+    // // )?;
 
-    let mut print_position_system = conn.prepare(
-        "
-        SELECT p.id, p.x, p.y, v.x, v.y
-        FROM position p
-        JOIN velocity v
-        ON p.id = v.id
-        ",
-    )?;
+    // let mut velocity_system = conn.prepare(
+    //     "
+    //     UPDATE position AS p SET
+    //         x = p.x + (v.x * :delta),
+    //         y = p.y + (v.y * :delta)
+    //     FROM velocity v WHERE p.id = v.id
+    // ",
+    // )?;
 
-    let framerate = 25;
-    let mut count = 0;
-    let mut delta: f64 = 0.;
-    let mut fps = fps_clock::FpsClock::new(framerate);
+    // let mut print_position_system = conn.prepare(
+    //     "
+    //     SELECT p.id, p.x, p.y, v.x, v.y
+    //     FROM position p
+    //     JOIN velocity v
+    //     ON p.id = v.id
+    //     ",
+    // )?;
 
-    loop {
-        let is_whole_second = count % framerate == 0;
+    // let framerate = 25;
+    // let mut count = 0;
+    // let mut delta: f64 = 0.;
+    // let mut fps = fps_clock::FpsClock::new(framerate);
 
-        // game logic
-        velocity_system.execute_named(named_params! {":delta":delta})?;
+    // loop {
+    //     let is_whole_second = count % framerate == 0;
 
-        if is_whole_second {
-            let mut positions = print_position_system.query(NO_PARAMS)?;
-            while let Some(pos) = positions.next()? {
-                println!(
-                    "{:?} {{ pos: ({:?}, {:?}), vel: ({:?}, {:?}) }}",
-                    pos.get::<usize, i32>(0)?,
-                    pos.get::<usize, f64>(1)?,
-                    pos.get::<usize, f64>(2)?,
-                    pos.get::<usize, f64>(3)?,
-                    pos.get::<usize, f64>(4)?
-                );
-            }
-        }
-        // println!("{} {} (fps: {})", count / framerate, delta, 1.0 / delta);
+    //     // game logic
+    //     velocity_system.execute_named(named_params! {":delta":delta})?;
 
-        count += 1;
-        if is_whole_second {
-            println!("a second passed");
-            println!("delta: {:?}", delta);
-            println!("efps: {:?}/{:?}", (1.0 / delta).trunc(), framerate);
-        }
-        // update timer
-        delta = fps.tick() as f64 / 10e8;
-        if count > 5 * framerate {
-            break;
-        }
-    }
+    //     if is_whole_second {
+    //         let mut positions = print_position_system.query(NO_PARAMS)?;
+    //         while let Some(pos) = positions.next()? {
+    //             println!(
+    //                 "{:?} {{ pos: ({:?}, {:?}), vel: ({:?}, {:?}) }}",
+    //                 pos.get::<usize, i32>(0)?,
+    //                 pos.get::<usize, f64>(1)?,
+    //                 pos.get::<usize, f64>(2)?,
+    //                 pos.get::<usize, f64>(3)?,
+    //                 pos.get::<usize, f64>(4)?
+    //             );
+    //         }
+    //     }
+    //     // println!("{} {} (fps: {})", count / framerate, delta, 1.0 / delta);
+
+    //     count += 1;
+    //     if is_whole_second {
+    //         println!("a second passed");
+    //         println!("delta: {:?}", delta);
+    //         println!("efps: {:?}/{:?}", (1.0 / delta).trunc(), framerate);
+    //     }
+    //     // update timer
+    //     delta = fps.tick() as f64 / 10e8;
+    //     if count > 5 * framerate {
+    //         break;
+    //     }
+    // }
 
     Ok(())
 }
