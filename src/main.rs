@@ -7,10 +7,11 @@ use crate::system::System;
 use crate::systems::gravity::GravitySystem;
 use crate::systems::movement::MovementSystem;
 use crate::systems::print_position::PrintPositionSystem;
+use minifb::{Window, WindowOptions};
 use sqlite::Result;
 
 fn main() -> Result<()> {
-    let app = App::new()?;
+    let app = App::new("SqliteECS", (400, 400))?;
 
     let boxed_movement_system = MovementSystem::new(&app)?;
 

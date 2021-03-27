@@ -1,11 +1,23 @@
+use minifb::{Window, WindowOptions};
 use sqlite::{Connection, Result};
 
 pub struct App {
+  pub window: Window,
   pub db: Connection,
 }
 
 impl App {
-  pub fn new() -> Result<Self> {
+  pub fn new(title: &str, (w, h): (usize, usize)) -> Result<Self> {
+    let window = Window::new(
+      title,
+      w,
+      h,
+      WindowOptions {
+        ..WindowOptions::default()
+      },
+    )
+    .unwrap();
+
     let db = Connection::open(":memory:")?;
     db.execute(
       "
@@ -50,6 +62,6 @@ impl App {
         COMMIT;",
     )?;
 
-    Ok(Self { db })
+    Ok(App { db, window })
   }
 }
