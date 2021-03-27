@@ -28,6 +28,12 @@ impl App {
 
             FOREIGN KEY(id) REFERENCES entity(id)
         );
+        CREATE TABLE gravity (
+            id          INTEGER,
+            amount      FLOAT DEFAULT 98.0,
+
+            FOREIGN KEY(id) REFERENCES entity(id)
+        );
 
         COMMIT;",
     )?;
@@ -37,10 +43,9 @@ impl App {
         BEGIN;
 
         INSERT INTO entity DEFAULT VALUES;
-
-        REPLACE INTO position VALUES (1, 100, 100);
-
-        REPLACE INTO velocity VALUES (1, 0, -10);
+        INSERT INTO position VALUES (1, 100, 100);
+        INSERT INTO velocity VALUES (1, 0, -10);
+        INSERT INTO gravity VALUES (1, 98);
 
         COMMIT;",
     )?;
