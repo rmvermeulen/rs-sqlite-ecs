@@ -1,4 +1,4 @@
-use rusqlite::{named_params, params, Connection, Result, NO_PARAMS};
+use rusqlite::{named_params, params, Connection, Result, Statement, NO_PARAMS};
 
 #[derive(Debug)]
 struct Person {
@@ -8,24 +8,15 @@ struct Person {
     velocity: (f64, f64),
 }
 
-use sql_builder::SqlBuilder;
+struct App {
+    db: Connection,
+}
 
-fn main() -> Result<()> {
-    let sql = SqlBuilder::select_from("company")
-        .field("id")
-        .field("name")
-        .and_where_gt("salary", 25_000)
-        .sql();
-
-    match sql {
-        Ok(sql) => println!("{}", sql),
-        Err(e) => println!("Error: {}", e),
-    }
-
-    let conn = Connection::open_in_memory()?;
-
-    conn.execute_batch(
-        "
+impl App {
+    fn new() -> Result<Self> {
+        let db = Connection::open_in_memory()?;
+        db.execute_batch(
+            "
         BEGIN;
 
         CREATE TABLE entity (
@@ -47,38 +38,112 @@ fn main() -> Result<()> {
         );
 
         COMMIT;",
-    )?;
+        )?;
 
-    conn.execute_batch(
-        "
+        db.execute_batch(
+            "
         BEGIN;
 
-        REPLACE INTO entity DEFAULT VALUES;
+        INSERT INTO entity DEFAULT VALUES;
 
-        REPLACE INTO position VALUES (:id, 100, 100);
+        REPLACE INTO position VALUES (1, 100, 100);
 
-        REPLACE INTO velocity VALUES (:id, 0, -10);
+        REPLACE INTO velocity VALUES (1, 0, -10);
 
         COMMIT;",
-    )?;
+        )?;
 
-    let mut velocity_system = conn.prepare(
-        "
-        UPDATE position AS p SET
-            x = p.x + (v.x * :delta),
-            y = p.y + (v.y * :delta)
-        FROM velocity v WHERE p.id = v.id
-    ",
-    )?;
+        {
+            let mut get_ids = db.prepare("select * from entity")?;
+            let mut rows = get_ids.query(NO_PARAMS)?;
+            println!("iterating ids...");
+            let mut ids = Vec::new();
+            while let Some(row) = rows.next()? {
+                ids.push(row.get::<usize, i32>(0)?);
+            }
+            println!("got ids: {:?}", ids);
+            println!("done");
+        }
+        Ok(Self { db })
+    }
+}
 
-    let mut print_position_system = conn.prepare(
-        "
-        SELECT p.id, p.x, p.y, v.x, v.y
-        FROM position p
-        JOIN velocity v
-        ON p.id = v.id
-        ",
-    )?;
+trait System<'a>: Sized {
+    fn new(app: &'a App) -> Result<Self>;
+    fn tick(&mut self, delta: f64);
+}
+
+struct PreparedStatement<'conn> {
+    pub statement: Statement<'conn>,
+}
+
+impl<'conn> PreparedStatement<'conn> {
+    pub fn new<'a>(conn: &'a Connection, sql: &str) -> Result<PreparedStatement<'a>> {
+        Ok(PreparedStatement {
+            statement: conn.prepare(sql)?,
+        })
+    }
+}
+
+struct VelocitySystem<'a> {
+    sql: PreparedStatement<'a>,
+}
+
+impl<'a> System<'a> for VelocitySystem<'a> {
+    fn new(app: &'a App) -> Result<Self> {
+        let statement = PreparedStatement::new(
+            &app.db,
+            "UPDATE position AS p SET
+                x = p.x + (v.x * :delta),
+                y = p.y + (v.y * :delta)
+            
+                FROM velocity v WHERE p.id = v.id",
+        )?;
+        Ok(VelocitySystem { sql: statement })
+    }
+    fn tick(&mut self, delta: f64) {
+        self.sql
+            .statement
+            .execute_named(named_params! {":delta":delta})
+            .unwrap();
+    }
+}
+
+struct PrintPositionSystem<'a> {
+    sql: PreparedStatement<'a>,
+}
+
+impl<'a> System<'a> for PrintPositionSystem<'a> {
+    fn new(app: &'a App) -> Result<Self> {
+        let statement = PreparedStatement::new(
+            &app.db,
+            "
+            SELECT e.id, p.x, p.y, v.x, v.y
+            FROM entity e
+            JOIN position p ON p.id = e.id
+            JOIN velocity v ON v.id = e.id",
+        )?;
+        Ok(PrintPositionSystem { sql: statement })
+    }
+    fn tick(&mut self, delta: f64) {
+        let mut positions = self.sql.statement.query(NO_PARAMS).unwrap();
+        while let Some(pos) = positions.next().unwrap() {
+            println!(
+                "{:?} {{ pos: ({:?}, {:?}), vel: ({:?}, {:?}) }}",
+                pos.get::<usize, i32>(0).unwrap(),
+                pos.get::<usize, f64>(1).unwrap(),
+                pos.get::<usize, f64>(2).unwrap(),
+                pos.get::<usize, f64>(3).unwrap(),
+                pos.get::<usize, f64>(4).unwrap()
+            );
+        }
+    }
+}
+
+fn main() -> Result<()> {
+    let app = App::new()?;
+    let mut velocity = VelocitySystem::new(&app)?;
+    let mut printer = PrintPositionSystem::new(&app)?;
 
     let framerate = 25;
     let mut count = 0;
@@ -89,29 +154,17 @@ fn main() -> Result<()> {
         let is_whole_second = count % framerate == 0;
 
         // game logic
-        velocity_system.execute_named(named_params! {":delta":delta})?;
+        velocity.tick(delta);
+        printer.tick(delta);
 
-        if is_whole_second {
-            let mut positions = print_position_system.query(NO_PARAMS)?;
-            while let Some(pos) = positions.next()? {
-                println!(
-                    "{:?} {{ pos: ({:?}, {:?}), vel: ({:?}, {:?}) }}",
-                    pos.get::<usize, i32>(0)?,
-                    pos.get::<usize, f64>(1)?,
-                    pos.get::<usize, f64>(2)?,
-                    pos.get::<usize, f64>(3)?,
-                    pos.get::<usize, f64>(4)?
-                );
-            }
-        }
-        // println!("{} {} (fps: {})", count / framerate, delta, 1.0 / delta);
-
-        count += 1;
         if is_whole_second {
             println!("a second passed");
             println!("delta: {:?}", delta);
             println!("efps: {:?}/{:?}", (1.0 / delta).trunc(), framerate);
         }
+        // println!("{} {} (fps: {})", count / framerate, delta, 1.0 / delta);
+
+        count += 1;
         // update timer
         delta = fps.tick() as f64 / 10e8;
         if count > 5 * framerate {
