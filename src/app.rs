@@ -47,7 +47,7 @@ impl App {
         );
         CREATE TABLE gravity (
           id          INTEGER,
-          amount      FLOAT DEFAULT 98.0,
+          amount      FLOAT DEFAULT 0.0,
 
           FOREIGN KEY(id) REFERENCES entity(id)
         );
