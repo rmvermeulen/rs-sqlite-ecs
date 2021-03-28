@@ -15,17 +15,13 @@ struct RenderData {
   y: f64,
 }
 
-pub struct App<'a> {
+pub struct App {
   window: Window,
-  pub connection: Connection,
-  render_data_sql: Statement<'a>,
   target: DrawTarget,
 }
 
-impl App<'_> {
-  pub fn new(window: Window) -> Result<Self> {
-    let connection = Connection::open(":memory:")?;
-    let c2 = Connection::open(":memory:")?;
+impl App {
+  pub fn new(window: Window, connection: &Connection) -> Result<Self> {
     connection.execute(
       "
         BEGIN;
@@ -76,30 +72,30 @@ impl App<'_> {
 
         COMMIT;",
     )?;
+
     let (width, height) = window.get_size();
+
     Ok(App {
       window,
       target: DrawTarget::new(width as i32, height as i32),
-      connection,
-      render_data_sql: connection.prepare(
-        "
-                SELECT g.shape, g.color, p.x, p.y
-                FROM entity e
-                JOIN graphics g ON g.id = e.id
-                JOIN position p ON p.id = e.id
-            ",
-      )?,
     })
   }
-  pub fn render(&mut self) -> Result<()> {
-    self.render_data_sql.reset()?;
+  pub fn render(&mut self, connection: &Connection) -> Result<()> {
+    let mut sql = connection.prepare(
+      "
+      SELECT g.shape, g.color, p.x, p.y
+      FROM entity e
+      JOIN graphics g ON g.id = e.id
+      JOIN position p ON p.id = e.id
+      ",
+    )?;
 
-    while let State::Row = self.render_data_sql.next()? {
+    while let State::Row = sql.next()? {
       self.render_entity(RenderData {
-        shape: self.render_data_sql.read::<String>(0)?,
-        color: self.render_data_sql.read::<String>(1)?,
-        x: self.render_data_sql.read::<f64>(2)?,
-        y: self.render_data_sql.read::<f64>(3)?,
+        shape: sql.read::<String>(0)?,
+        color: sql.read::<String>(1)?,
+        x: sql.read::<f64>(2)?,
+        y: sql.read::<f64>(3)?,
       });
     }
     let (w, h) = self.window.get_size();

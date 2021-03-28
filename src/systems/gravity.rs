@@ -12,7 +12,7 @@ impl<'a> System<'a> for GravitySystem<'a> {
         let statement = connection.prepare(
             "
       UPDATE velocity AS v
-      SET y = v.y - (g.amount * :delta)
+      SET y = v.y + (g.amount * :delta)
       FROM gravity g WHERE g.id = v.id
         ",
         )?;

@@ -10,6 +10,7 @@ use crate::systems::print_position::PrintPositionSystem;
 use anyhow::Result;
 use minifb::Window;
 use minifb::WindowOptions;
+use sqlite::Connection;
 use std::rc::Rc;
 
 fn main() -> Result<()> {
@@ -23,14 +24,15 @@ fn main() -> Result<()> {
         },
     )?;
 
-    let mut app = App::new(window)?;
+    let connection = Connection::open(":memory:")?;
+    let mut app = App::new(window, &connection)?;
 
-    let boxed_movement_system = MovementSystem::new(&app.connection)?;
+    let boxed_movement_system = MovementSystem::new(&connection)?;
 
-    let mut boxed_printer_system = PrintPositionSystem::new(&app.connection)?;
+    let mut boxed_printer_system = PrintPositionSystem::new(&connection)?;
     boxed_printer_system.set_interval(1.0);
 
-    let boxed_gravity_system = GravitySystem::new(&app.connection)?;
+    let boxed_gravity_system = GravitySystem::new(&connection)?;
 
     let mut systems: Vec<Box<dyn System>> = vec![
         boxed_movement_system,
@@ -48,7 +50,7 @@ fn main() -> Result<()> {
         for system in &mut systems {
             system.tick(delta)?;
         }
-        app.render()?;
+        app.render(&connection)?;
 
         count += 1;
         // update timer
