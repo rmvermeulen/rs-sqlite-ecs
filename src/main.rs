@@ -12,6 +12,7 @@ use anyhow::Result;
 use minifb::Window;
 use minifb::WindowOptions;
 use sqlite::Connection;
+use std::time::Instant;
 
 fn main() -> Result<()> {
     let (width, height) = (400, 400);
@@ -40,24 +41,23 @@ fn main() -> Result<()> {
         boxed_gravity_system,
     ];
 
-    let framerate = 25;
-    let mut count = 0;
     let mut delta: f64 = 0.;
-    let mut fps = fps_clock::FpsClock::new(framerate);
 
+    let game_start = Instant::now();
     loop {
+        let frame_start = Instant::now();
         // game logic
         for system in &mut systems {
             system.tick(delta)?;
         }
         app.render(&connection)?;
 
-        count += 1;
-        // update timer
-        delta = fps.tick() as f64 / 10e8;
-        if count > 8 * framerate {
+        if game_start.elapsed().as_secs_f64() > 5. {
             break;
         }
+
+        delta = frame_start.elapsed().as_secs_f64();
+        // println!("fps: {} (delta: {})", 1.0 / delta, delta);
     }
 
     Ok(())
