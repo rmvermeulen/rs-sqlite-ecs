@@ -1,6 +1,7 @@
 use crate::app::App;
 use crate::system::System;
-use sqlite::{Result, State, Statement};
+use anyhow::Result;
+use sqlite::{Connection, State, Statement};
 
 pub struct PrintPositionSystem<'a> {
   sql: Statement<'a>,
@@ -14,8 +15,8 @@ impl PrintPositionSystem<'_> {
   }
 }
 impl<'a> System<'a> for PrintPositionSystem<'a> {
-  fn new(app: &'a App) -> Result<Box<Self>> {
-    let statement = app.db.prepare(
+  fn new(connection: &'a Connection) -> Result<Box<Self>> {
+    let statement = connection.prepare(
       "
             SELECT e.id, p.x, p.y, v.x, v.y
             FROM entity e

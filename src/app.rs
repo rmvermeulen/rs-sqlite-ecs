@@ -41,10 +41,17 @@ impl App {
             FOREIGN KEY(id) REFERENCES entity(id)
         );
         CREATE TABLE gravity (
-            id          INTEGER,
-            amount      FLOAT DEFAULT 98.0,
+          id          INTEGER,
+          amount      FLOAT DEFAULT 98.0,
 
-            FOREIGN KEY(id) REFERENCES entity(id)
+          FOREIGN KEY(id) REFERENCES entity(id)
+        );
+        CREATE TABLE graphics (
+          id         INTEGER,
+          shape      TEXT,
+          color      TEXT,
+
+          FOREIGN KEY(id) REFERENCES entity(id)
         );
 
         COMMIT;",
@@ -57,11 +64,15 @@ impl App {
         INSERT INTO entity DEFAULT VALUES;
         INSERT INTO position VALUES (1, 100, 100);
         INSERT INTO velocity VALUES (1, 0, -10);
-        INSERT INTO gravity VALUES (1, 98);
+        INSERT INTO gravity VALUES (1, 9.8);
+        INSERT INTO graphics VALUES (1, 'rect', 'red');
 
         COMMIT;",
     )?;
 
     Ok(App { db, window })
+  }
+  pub fn render(&mut self) -> Result<()> {
+    Ok(())
   }
 }

@@ -1,17 +1,18 @@
 use crate::app::App;
 use crate::system::System;
-use sqlite::{Result, State, Statement};
+use anyhow::Result;
+use sqlite::{Connection, State, Statement};
 
 pub struct GravitySystem<'a> {
     sql: Statement<'a>,
 }
 
 impl<'a> System<'a> for GravitySystem<'a> {
-    fn new(app: &'a App) -> Result<Box<Self>> {
-        let statement = app.db.prepare(
+    fn new(connection: &'a Connection) -> Result<Box<Self>> {
+        let statement = connection.prepare(
             "
       UPDATE velocity AS v
-      SET y = v.y + (g.amount * :delta)
+      SET y = v.y - (g.amount * :delta)
       FROM gravity g WHERE g.id = v.id
         ",
         )?;

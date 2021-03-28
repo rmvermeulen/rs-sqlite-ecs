@@ -1,8 +1,8 @@
-use crate::app::App;
-use sqlite::Result;
+use anyhow::Result;
+use sqlite::Connection;
 
 pub trait System<'a> {
-  fn new(app: &'a App) -> Result<Box<Self>>
+  fn new(connection: &'a Connection) -> Result<Box<Self>>
   where
     Self: Sized;
   fn tick(&mut self, delta: f64) -> Result<()>;

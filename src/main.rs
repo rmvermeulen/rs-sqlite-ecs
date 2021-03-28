@@ -7,18 +7,19 @@ use crate::system::System;
 use crate::systems::gravity::GravitySystem;
 use crate::systems::movement::MovementSystem;
 use crate::systems::print_position::PrintPositionSystem;
-use minifb::{Window, WindowOptions};
-use sqlite::Result;
+use crate::systems::renderer::RenderSystem;
+use anyhow::Result;
+use std::rc::Rc;
 
 fn main() -> Result<()> {
-    let app = App::new("SqliteECS", (400, 400))?;
+    let mut app = App::new("SqliteECS", (400, 400))?;
 
-    let boxed_movement_system = MovementSystem::new(&app)?;
+    let boxed_movement_system = MovementSystem::new(&app.db)?;
 
-    let mut boxed_printer_system = PrintPositionSystem::new(&app)?;
+    let mut boxed_printer_system = PrintPositionSystem::new(&app.db)?;
     boxed_printer_system.set_interval(1.0);
 
-    let boxed_gravity_system = GravitySystem::new(&app)?;
+    let boxed_gravity_system = GravitySystem::new(&app.db)?;
 
     let mut systems: Vec<Box<dyn System>> = vec![
         boxed_movement_system,
@@ -36,11 +37,12 @@ fn main() -> Result<()> {
         for system in &mut systems {
             system.tick(delta)?;
         }
+        app.render()?;
 
         count += 1;
         // update timer
         delta = fps.tick() as f64 / 10e8;
-        if count > 5 * framerate {
+        if count > 8 * framerate {
             break;
         }
     }
