@@ -7,19 +7,30 @@ use crate::system::System;
 use crate::systems::gravity::GravitySystem;
 use crate::systems::movement::MovementSystem;
 use crate::systems::print_position::PrintPositionSystem;
-use crate::systems::renderer::RenderSystem;
 use anyhow::Result;
+use minifb::Window;
+use minifb::WindowOptions;
 use std::rc::Rc;
 
 fn main() -> Result<()> {
-    let mut app = App::new("SqliteECS", (400, 400))?;
+    let (width, height) = (400, 400);
+    let window = Window::new(
+        "SqliteECS",
+        width,
+        height,
+        WindowOptions {
+            ..WindowOptions::default()
+        },
+    )?;
 
-    let boxed_movement_system = MovementSystem::new(&app.db)?;
+    let mut app = App::new(window)?;
 
-    let mut boxed_printer_system = PrintPositionSystem::new(&app.db)?;
+    let boxed_movement_system = MovementSystem::new(&app.connection)?;
+
+    let mut boxed_printer_system = PrintPositionSystem::new(&app.connection)?;
     boxed_printer_system.set_interval(1.0);
 
-    let boxed_gravity_system = GravitySystem::new(&app.db)?;
+    let boxed_gravity_system = GravitySystem::new(&app.connection)?;
 
     let mut systems: Vec<Box<dyn System>> = vec![
         boxed_movement_system,
