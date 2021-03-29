@@ -1,3 +1,5 @@
+use crate::components::{entity_add_component, Components};
+
 use anyhow::Result;
 use minifb::Window;
 use raqote::DrawOptions;
@@ -5,7 +7,7 @@ use raqote::DrawTarget;
 use raqote::PathBuilder;
 use raqote::SolidSource;
 use raqote::Source;
-use sqlite::{Connection, State, Statement};
+use sqlite::{Connection, State};
 
 #[derive(Debug)]
 struct RenderData {
@@ -65,12 +67,20 @@ impl App {
         BEGIN;
 
         INSERT INTO entity DEFAULT VALUES;
-        INSERT INTO position VALUES (1, 100, 100);
-        INSERT INTO velocity VALUES (1, 0, -10);
-        INSERT INTO gravity VALUES (1, 9.8);
-        INSERT INTO graphics VALUES (1, 'rect', 'red');
 
         COMMIT;",
+    )?;
+
+    entity_add_component(connection, 1, Components::Position { x: 100., y: 100. })?;
+    entity_add_component(connection, 1, Components::Velocity { x: 0., y: 0. })?;
+    entity_add_component(connection, 1, Components::Gravity(9.8))?;
+    entity_add_component(
+      connection,
+      1,
+      Components::Graphics {
+        shape: String::from("rect"),
+        color: String::from("red"),
+      },
     )?;
 
     let (width, height) = window.get_size();

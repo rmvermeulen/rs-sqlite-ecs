@@ -2,7 +2,9 @@ mod app;
 mod system;
 mod systems;
 
+mod components;
 use crate::app::App;
+use crate::components::Components;
 use crate::system::System;
 use crate::systems::gravity::GravitySystem;
 use crate::systems::movement::MovementSystem;
