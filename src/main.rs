@@ -1,10 +1,9 @@
 mod app;
+mod components;
 mod system;
 mod systems;
 
-mod components;
 use crate::app::App;
-use crate::components::Components;
 use crate::system::System;
 use crate::systems::gravity::GravitySystem;
 use crate::systems::movement::MovementSystem;
@@ -13,7 +12,6 @@ use anyhow::Result;
 use minifb::Window;
 use minifb::WindowOptions;
 use sqlite::Connection;
-use std::rc::Rc;
 
 fn main() -> Result<()> {
     let (width, height) = (400, 400);

@@ -1,4 +1,4 @@
-use crate::components::{entity_add_component, Components};
+use crate::components::{entity_add_component, Builder, Component};
 
 use anyhow::Result;
 use minifb::Window;
@@ -67,21 +67,31 @@ impl App {
         BEGIN;
 
         INSERT INTO entity DEFAULT VALUES;
+        INSERT INTO entity DEFAULT VALUES;
 
         COMMIT;",
     )?;
 
-    entity_add_component(connection, 1, Components::Position { x: 100., y: 100. })?;
-    entity_add_component(connection, 1, Components::Velocity { x: 0., y: 0. })?;
-    entity_add_component(connection, 1, Components::Gravity(9.8))?;
-    entity_add_component(
-      connection,
-      1,
-      Components::Graphics {
+    Builder::new(connection)
+      .set_entity(1)
+      .add_component(Component::Position { x: 100., y: 100. })?
+      .add_component(Component::Velocity { x: 0., y: 0. })?
+      .add_component(Component::Gravity(9.8))?
+      .add_component(Component::Graphics {
         shape: String::from("rect"),
         color: String::from("red"),
-      },
-    )?;
+      })?
+      .finish()?;
+    Builder::new(connection)
+      .set_entity(2)
+      .add_component(Component::Position { x: 200., y: 100. })?
+      .add_component(Component::Velocity { x: 0., y: 0. })?
+      .add_component(Component::Gravity(12.0))?
+      .add_component(Component::Graphics {
+        shape: String::from("rect"),
+        color: String::from("blue"),
+      })?
+      .finish()?;
 
     let (width, height) = window.get_size();
 
