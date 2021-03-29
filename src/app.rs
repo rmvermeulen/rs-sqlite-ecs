@@ -110,6 +110,9 @@ impl App {
       ",
     )?;
 
+    let bg_color = SolidSource::from_unpremultiplied_argb(0xff, 0xff, 0xff, 0xff);
+    self.target.clear(bg_color);
+
     while let State::Row = sql.next()? {
       self.render_entity(RenderData {
         shape: sql.read::<String>(0)?,
@@ -126,9 +129,7 @@ impl App {
     Ok(())
   }
   fn render_entity(&mut self, data: RenderData) {
-    let bg_color = SolidSource::from_unpremultiplied_argb(0xff, 0xff, 0xff, 0xff);
     let rect_color = Source::Solid(SolidSource::from_unpremultiplied_argb(0xff, 0, 0xff, 0));
-    self.target.clear(bg_color);
 
     let mut pb = PathBuilder::new();
     pb.rect((data.x - 16.) as f32, (data.y - 16.) as f32, 32., 32.);
