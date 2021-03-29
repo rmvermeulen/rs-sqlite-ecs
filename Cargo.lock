@@ -827,6 +827,7 @@ name = "rs-sqlite-ecs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "font-kit",
  "fps_clock",
  "minifb",
  "raqote",

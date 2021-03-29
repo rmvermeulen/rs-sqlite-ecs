@@ -1,12 +1,11 @@
-use crate::components::{entity_add_component, Builder, Component};
+use crate::components::{Builder, Component};
 
 use anyhow::Result;
+use font_kit::family_name::FamilyName;
+use font_kit::properties::Properties;
+use font_kit::source::SystemSource;
 use minifb::Window;
-use raqote::DrawOptions;
-use raqote::DrawTarget;
-use raqote::PathBuilder;
-use raqote::SolidSource;
-use raqote::Source;
+use raqote::{DrawOptions, DrawTarget, PathBuilder, Point, SolidSource, Source};
 use sqlite::{Connection, State};
 
 #[derive(Debug)]
@@ -18,6 +17,7 @@ struct RenderData {
 }
 
 pub struct App {
+  pub fps: f64,
   window: Window,
   target: DrawTarget,
 }
@@ -69,6 +69,10 @@ impl App {
         INSERT INTO entity DEFAULT VALUES;
         INSERT INTO entity DEFAULT VALUES;
 
+        INSERT INTO entity DEFAULT VALUES;
+        INSERT INTO position VALUES (2, 100, 300);
+        INSERT INTO graphics VALUES (2, 'rect', 'blue');
+
         COMMIT;",
     )?;
 
@@ -96,11 +100,15 @@ impl App {
     let (width, height) = window.get_size();
 
     Ok(App {
+      fps: 0.,
       window,
       target: DrawTarget::new(width as i32, height as i32),
     })
   }
   pub fn render(&mut self, connection: &Connection) -> Result<()> {
+    let bg_color = SolidSource::from_unpremultiplied_argb(0xff, 0xff, 0xff, 0xff);
+    self.target.clear(bg_color);
+
     let mut sql = connection.prepare(
       "
       SELECT g.shape, g.color, p.x, p.y
@@ -121,6 +129,19 @@ impl App {
         y: sql.read::<f64>(3)?,
       });
     }
+    let font = SystemSource::new()
+      .select_best_match(&[FamilyName::SansSerif], &Properties::new())
+      .unwrap()
+      .load()
+      .unwrap();
+    self.target.draw_text(
+      &font,
+      14.,
+      &format!("fps: {:.1}", self.fps),
+      Point::new(0., 100.),
+      &Source::Solid(SolidSource::from_unpremultiplied_argb(0xff, 0, 0, 0)),
+      &DrawOptions::new(),
+    );
     let (w, h) = self.window.get_size();
     self
       .window

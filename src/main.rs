@@ -7,10 +7,9 @@ use crate::app::App;
 use crate::system::System;
 use crate::systems::gravity::GravitySystem;
 use crate::systems::movement::MovementSystem;
-use crate::systems::print_position::PrintPositionSystem;
+
 use anyhow::Result;
-use minifb::Window;
-use minifb::WindowOptions;
+use minifb::{Window, WindowOptions};
 use sqlite::Connection;
 use std::time::Instant;
 
@@ -28,17 +27,9 @@ fn main() -> Result<()> {
     let connection = Connection::open(":memory:")?;
     let mut app = App::new(window, &connection)?;
 
-    let boxed_movement_system = MovementSystem::new(&connection)?;
-
-    let mut boxed_printer_system = PrintPositionSystem::new(&connection)?;
-    boxed_printer_system.set_interval(1.0);
-
-    let boxed_gravity_system = GravitySystem::new(&connection)?;
-
     let mut systems: Vec<Box<dyn System>> = vec![
-        boxed_movement_system,
-        boxed_printer_system,
-        boxed_gravity_system,
+        MovementSystem::new(&connection)?,
+        GravitySystem::new(&connection)?,
     ];
 
     let mut delta: f64 = 0.;
@@ -58,6 +49,7 @@ fn main() -> Result<()> {
 
         delta = frame_start.elapsed().as_secs_f64();
         // println!("fps: {} (delta: {})", 1.0 / delta, delta);
+        app.fps = 1.0 / delta;
     }
 
     Ok(())
