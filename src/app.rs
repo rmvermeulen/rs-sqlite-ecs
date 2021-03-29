@@ -80,7 +80,7 @@ impl App {
       .set_entity(1)
       .add_component(Component::Position { x: 100., y: 100. })?
       .add_component(Component::Velocity { x: 0., y: 0. })?
-      .add_component(Component::Gravity(9.8))?
+      .add_component(Component::Gravity(100.))?
       .add_component(Component::Graphics {
         shape: String::from("rect"),
         color: String::from("red"),
@@ -90,7 +90,7 @@ impl App {
       .set_entity(2)
       .add_component(Component::Position { x: 200., y: 100. })?
       .add_component(Component::Velocity { x: 0., y: 0. })?
-      .add_component(Component::Gravity(12.0))?
+      .add_component(Component::Gravity(100.))?
       .add_component(Component::Graphics {
         shape: String::from("rect"),
         color: String::from("blue"),
