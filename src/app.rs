@@ -10,10 +10,11 @@ use sqlite::{Connection, State};
 
 #[derive(Debug)]
 struct RenderData {
-  shape: String,
   color: String,
   x: f64,
   y: f64,
+  width: f64,
+  height: f64,
 }
 
 pub struct App {
@@ -57,7 +58,8 @@ impl App {
         );
         CREATE TABLE graphics (
           id         INTEGER,
-          shape      TEXT,
+          width      FLOAT DEFAULT 8.0,
+          height     FLOAT DEFAULT 8.0,
           color      TEXT,
 
           FOREIGN KEY(id) REFERENCES entity(id)
@@ -70,29 +72,38 @@ impl App {
       "
         BEGIN;
 
-        INSERT INTO entity DEFAULT VALUES;
-        INSERT INTO entity DEFAULT VALUES;
+        -- INSERT INTO entity DEFAULT VALUES;
+        -- INSERT INTO entity DEFAULT VALUES;
 
         COMMIT;",
     )?;
 
     Builder::new(connection)
-      .set_entity(1)
+      .add_component(Component::Position { x: 200., y: 400. })?
+      .add_component(Component::Graphics {
+        width: 128.,
+        height: 8.,
+        color: String::from("green"),
+      })?
+      .finish()?;
+
+    Builder::new(connection)
       .add_component(Component::Position { x: 100., y: 100. })?
       .add_component(Component::Velocity { x: 0., y: 0. })?
       .add_component(Component::Gravity(100.))?
       .add_component(Component::Graphics {
-        shape: String::from("rect"),
+        width: 32.,
+        height: 32.,
         color: String::from("red"),
       })?
       .finish()?;
     Builder::new(connection)
-      .set_entity(2)
       .add_component(Component::Position { x: 200., y: 100. })?
       .add_component(Component::Velocity { x: 0., y: 0. })?
       .add_component(Component::Gravity(100.))?
       .add_component(Component::Graphics {
-        shape: String::from("rect"),
+        width: 32.,
+        height: 32.,
         color: String::from("blue"),
       })?
       .finish()?;
@@ -111,7 +122,7 @@ impl App {
 
     let mut sql = connection.prepare(
       "
-      SELECT g.shape, g.color, p.x, p.y
+      SELECT p.x, p.y, g.width, g.height, g.color
       FROM entity e
       JOIN graphics g ON g.id = e.id
       JOIN position p ON p.id = e.id
@@ -123,10 +134,11 @@ impl App {
 
     while let State::Row = sql.next()? {
       self.render_entity(RenderData {
-        shape: sql.read::<String>(0)?,
-        color: sql.read::<String>(1)?,
-        x: sql.read::<f64>(2)?,
-        y: sql.read::<f64>(3)?,
+        x: sql.read::<f64>(0)?,
+        y: sql.read::<f64>(1)?,
+        width: sql.read::<f64>(2)?,
+        height: sql.read::<f64>(3)?,
+        color: sql.read::<String>(4)?,
       });
     }
     let font = SystemSource::new()
@@ -157,7 +169,12 @@ impl App {
       _ => color(0x88, 0x88, 0x88, 0xff),
     };
     let mut pb = PathBuilder::new();
-    pb.rect((data.x - 16.) as f32, (data.y - 16.) as f32, 32., 32.);
+    pb.rect(
+      (data.x - (data.width / 2.)) as f32,
+      (data.y - (data.height / 2.)) as f32,
+      data.width as f32,
+      data.height as f32,
+    );
     let path = pb.finish();
     self
       .target
