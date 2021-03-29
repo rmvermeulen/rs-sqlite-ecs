@@ -5,6 +5,7 @@ mod systems;
 
 use crate::app::App;
 use crate::system::System;
+use crate::systems::collision::CollisionSystem;
 use crate::systems::gravity::GravitySystem;
 use crate::systems::movement::MovementSystem;
 
@@ -30,6 +31,7 @@ fn main() -> Result<()> {
     let mut systems: Vec<Box<dyn System>> = vec![
         MovementSystem::new(&connection)?,
         GravitySystem::new(&connection)?,
+        CollisionSystem::new(&connection)?,
     ];
 
     let mut delta: f64 = 0.;
