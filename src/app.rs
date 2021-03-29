@@ -22,6 +22,10 @@ pub struct App {
   target: DrawTarget,
 }
 
+fn color(r: u8, g: u8, b: u8, a: u8) -> SolidSource {
+  SolidSource::from_unpremultiplied_argb(a, r, g, b)
+}
+
 impl App {
   pub fn new(window: Window, connection: &Connection) -> Result<Self> {
     connection.execute(
@@ -68,10 +72,6 @@ impl App {
 
         INSERT INTO entity DEFAULT VALUES;
         INSERT INTO entity DEFAULT VALUES;
-
-        INSERT INTO entity DEFAULT VALUES;
-        INSERT INTO position VALUES (2, 100, 300);
-        INSERT INTO graphics VALUES (2, 'rect', 'blue');
 
         COMMIT;",
     )?;
@@ -150,11 +150,17 @@ impl App {
     Ok(())
   }
   fn render_entity(&mut self, data: RenderData) {
-    let rect_color = Source::Solid(SolidSource::from_unpremultiplied_argb(0xff, 0, 0xff, 0));
-
+    let rect_color = match data.color.as_ref() {
+      "red" => color(0xff, 0, 0, 0xff),
+      "green" => color(0, 0xff, 0, 0xff),
+      "blue" => color(0, 0, 0xff, 0xff),
+      _ => color(0x88, 0x88, 0x88, 0xff),
+    };
     let mut pb = PathBuilder::new();
     pb.rect((data.x - 16.) as f32, (data.y - 16.) as f32, 32., 32.);
     let path = pb.finish();
-    self.target.fill(&path, &rect_color, &DrawOptions::new());
+    self
+      .target
+      .fill(&path, &Source::Solid(rect_color), &DrawOptions::new());
   }
 }
