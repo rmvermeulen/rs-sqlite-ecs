@@ -1,5 +1,6 @@
 use crate::components::{Builder, Component};
 
+use anyhow::anyhow;
 use anyhow::Result;
 use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
@@ -9,7 +10,7 @@ use raqote::{DrawOptions, DrawTarget, PathBuilder, Point, SolidSource, Source};
 use sqlite::{Connection, State};
 
 #[derive(Debug)]
-struct RenderData {
+struct RenderCommand {
   color: String,
   x: f64,
   y: f64,
@@ -28,92 +29,14 @@ fn color(r: u8, g: u8, b: u8, a: u8) -> SolidSource {
 }
 
 impl App {
-  pub fn new(window: Window, connection: &Connection) -> Result<Self> {
-    connection.execute(
-      "
-        BEGIN;
-
-        CREATE TABLE entity (
-            id          INTEGER PRIMARY KEY
-        );
-        CREATE TABLE position (
-            id          INTEGER,
-            x           FLOAT DEFAULT 0,
-            y           FLOAT DEFAULT 0,
-
-            FOREIGN KEY(id) REFERENCES entity(id)
-        );
-        CREATE TABLE velocity (
-            id          INTEGER,
-            x           FLOAT DEFAULT 0,
-            y           FLOAT DEFAULT 0,
-
-            FOREIGN KEY(id) REFERENCES entity(id)
-        );
-        CREATE TABLE gravity (
-          id          INTEGER,
-          amount      FLOAT DEFAULT 0.0,
-
-          FOREIGN KEY(id) REFERENCES entity(id)
-        );
-        CREATE TABLE graphics (
-          id         INTEGER,
-          width      FLOAT DEFAULT 8.0,
-          height     FLOAT DEFAULT 8.0,
-          color      TEXT,
-
-          FOREIGN KEY(id) REFERENCES entity(id)
-        );
-
-        COMMIT;",
-    )?;
-
-    connection.execute(
-      "
-        BEGIN;
-
-        -- INSERT INTO entity DEFAULT VALUES;
-        -- INSERT INTO entity DEFAULT VALUES;
-
-        COMMIT;",
-    )?;
-
-    Builder::new(connection)
-      .add_component(Component::Position { x: 200., y: 400. })?
-      .add_component(Component::Graphics {
-        width: 128.,
-        height: 8.,
-        color: String::from("green"),
-      })?
-      .finish()?;
-
-    Builder::new(connection)
-      .add_component(Component::Position { x: 100., y: 100. })?
-      .add_component(Component::Velocity { x: 0., y: 0. })?
-      .add_component(Component::Gravity(100.))?
-      .add_component(Component::Graphics {
-        width: 32.,
-        height: 32.,
-        color: String::from("red"),
-      })?
-      .finish()?;
-    Builder::new(connection)
-      .add_component(Component::Position { x: 200., y: 100. })?
-      .add_component(Component::Velocity { x: 0., y: 0. })?
-      .add_component(Component::Gravity(100.))?
-      .add_component(Component::Graphics {
-        width: 32.,
-        height: 32.,
-        color: String::from("blue"),
-      })?
-      .finish()?;
-
+  pub fn new(window: Window) -> Result<Self> {
     let (width, height) = window.get_size();
+    let target = DrawTarget::new(width as i32, height as i32);
 
     Ok(App {
       fps: 0.,
       window,
-      target: DrawTarget::new(width as i32, height as i32),
+      target,
     })
   }
   pub fn render(&mut self, connection: &Connection) -> Result<()> {
@@ -122,24 +45,27 @@ impl App {
 
     let mut sql = connection.prepare(
       "
-      SELECT p.x, p.y, g.width, g.height, g.color
-      FROM entity e
-      JOIN graphics g ON g.id = e.id
-      JOIN position p ON p.id = e.id
-      ",
+          SELECT p.x, p.y, g.width, g.height, g.color
+          FROM entity e
+          JOIN graphics g ON g.id = e.id
+          JOIN position p ON p.id = e.id
+          ",
     )?;
 
     let bg_color = SolidSource::from_unpremultiplied_argb(0xff, 0xff, 0xff, 0xff);
     self.target.clear(bg_color);
 
     while let State::Row = sql.next()? {
-      self.render_entity(RenderData {
-        x: sql.read::<f64>(0)?,
-        y: sql.read::<f64>(1)?,
-        width: sql.read::<f64>(2)?,
-        height: sql.read::<f64>(3)?,
-        color: sql.read::<String>(4)?,
-      });
+      Self::render_entity(
+        &mut self.target,
+        RenderCommand {
+          x: sql.read::<f64>(0)?,
+          y: sql.read::<f64>(1)?,
+          width: sql.read::<f64>(2)?,
+          height: sql.read::<f64>(3)?,
+          color: sql.read::<String>(4)?,
+        },
+      );
     }
     let font = SystemSource::new()
       .select_best_match(&[FamilyName::SansSerif], &Properties::new())
@@ -155,13 +81,13 @@ impl App {
       &DrawOptions::new(),
     );
     let (w, h) = self.window.get_size();
+
     self
       .window
       .update_with_buffer(self.target.get_data(), w, h)?;
-
     Ok(())
   }
-  fn render_entity(&mut self, data: RenderData) {
+  fn render_entity(target: &mut DrawTarget, data: RenderCommand) {
     let rect_color = match data.color.as_ref() {
       "red" => color(0xff, 0, 0, 0xff),
       "green" => color(0, 0xff, 0, 0xff),
@@ -176,8 +102,6 @@ impl App {
       data.height as f32,
     );
     let path = pb.finish();
-    self
-      .target
-      .fill(&path, &Source::Solid(rect_color), &DrawOptions::new());
+    target.fill(&path, &Source::Solid(rect_color), &DrawOptions::new());
   }
 }

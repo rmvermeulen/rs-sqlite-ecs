@@ -1,9 +1,11 @@
 mod app;
 mod components;
+mod db;
 mod system;
 mod systems;
 
 use crate::app::App;
+use crate::db::Database;
 use crate::system::System;
 use crate::systems::collision::CollisionSystem;
 use crate::systems::gravity::GravitySystem;
@@ -26,7 +28,8 @@ fn main() -> Result<()> {
     )?;
 
     let connection = Connection::open(":memory:")?;
-    let mut app = App::new(window, &connection)?;
+    Database::initialize_tables(&connection)?;
+    let mut app = App::new(window)?;
 
     let mut systems: Vec<Box<dyn System>> = vec![
         MovementSystem::new(&connection)?,
