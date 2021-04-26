@@ -32,42 +32,10 @@ mod tests {
   use super::*;
   use crate::Database;
   #[derive(Debug, PartialEq)]
-  struct Position {
+  struct TestData {
     id: i32,
     x: f64,
     y: f64,
-  }
-  fn get_positions(connection: &Connection) -> Result<Vec<Position>> {
-    let mut results = Vec::new();
-
-    connection.iterate("select id, x, y from position", |pairs| {
-      let mut mPos = None;
-      for &(column, value) in pairs.iter() {
-        mPos = match column {
-          "id" => Some(Position {
-            id: value.unwrap().parse::<i32>().unwrap(),
-            x: 0.,
-            y: 0.,
-          }),
-          "x" => mPos.map(|mut pos| {
-            pos.x = value.unwrap().parse::<f64>().unwrap();
-            pos
-          }),
-
-          "y" => {
-            mPos.map(|mut pos| {
-              pos.y = value.unwrap().parse::<f64>().unwrap();
-              results.push(pos);
-            });
-            None
-          }
-          _ => mPos,
-        }
-      }
-      true
-    })?;
-
-    Ok(results)
   }
   #[test]
   fn update_position_with_velocity() -> Result<()> {
@@ -78,19 +46,19 @@ mod tests {
     connection.execute("update velocity set x = 50, y = 25 where id = 2;")?;
 
     assert_eq!(
-      get_positions(&connection)?,
+      get_entities_positions_helper(&connection)?,
       vec![
-        Position {
+        TestData {
           id: 1,
           x: 200.0,
           y: 400.0
         },
-        Position {
+        TestData {
           id: 2,
           x: 100.0,
           y: 100.0
         },
-        Position {
+        TestData {
           id: 3,
           x: 200.0,
           y: 100.0
@@ -102,31 +70,20 @@ mod tests {
 
     system.tick(1.0)?;
 
-    let mut results = Vec::new();
-    connection.iterate("select x, y from position", |pairs| {
-      for &(column, value) in pairs.iter() {
-        match value.unwrap().parse::<f64>() {
-          Ok(n) => results.push((String::from(column), n)),
-          _ => {}
-        }
-      }
-      true
-    })?;
-
     assert_eq!(
-      get_positions(&connection)?,
+      get_entities_positions_helper(&connection)?,
       vec![
-        Position {
+        TestData {
           id: 1,
           x: 200.0,
           y: 400.0
         },
-        Position {
+        TestData {
           id: 2,
           x: 100.0 + 50.0,
           y: 100.0 + 25.0
         },
-        Position {
+        TestData {
           id: 3,
           x: 200.0,
           y: 100.0
@@ -134,5 +91,37 @@ mod tests {
       ]
     );
     Ok(())
+  }
+  fn get_entities_positions_helper(connection: &Connection) -> Result<Vec<TestData>> {
+    let mut results = Vec::new();
+
+    connection.iterate("select id, x, y from position", |pairs| {
+      let mut current_data = None;
+      for &(column, value) in pairs.iter() {
+        current_data = match column {
+          "id" => Some(TestData {
+            id: value.unwrap().parse::<i32>().unwrap(),
+            x: 0.,
+            y: 0.,
+          }),
+          "x" => current_data.map(|mut pos| {
+            pos.x = value.unwrap().parse::<f64>().unwrap();
+            pos
+          }),
+
+          "y" => {
+            current_data.map(|mut pos| {
+              pos.y = value.unwrap().parse::<f64>().unwrap();
+              results.push(pos);
+            });
+            None
+          }
+          _ => current_data,
+        }
+      }
+      true
+    })?;
+
+    Ok(results)
   }
 }
